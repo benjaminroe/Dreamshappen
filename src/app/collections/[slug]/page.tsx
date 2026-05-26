@@ -37,8 +37,26 @@ export default async function ProductPage({
     .filter((p) => p.slug !== product.slug)
     .slice(0, 3);
 
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: product.title,
+    description: product.description || product.subtitle,
+    brand: { "@type": "Brand", name: "Dreams Happen Ltd" },
+    offers: {
+      "@type": "Offer",
+      priceCurrency: product.currency,
+      price: (product.price / 100).toFixed(2),
+      availability: "https://schema.org/InStock",
+    },
+  };
+
   return (
     <article className="mx-auto max-w-6xl px-6 py-16">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       <nav className="mb-10 text-sm text-stone">
         <Link href="/collections" className="link-underline">
           The Collections

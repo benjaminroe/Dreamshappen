@@ -34,3 +34,15 @@ export async function upsertDiscount(code: string, percentOff: number, active = 
     update: { percentOff, active },
   });
 }
+
+export async function listDiscounts(): Promise<Discount[]> {
+  const rows = await prisma.discountCode.findMany({ orderBy: { code: "asc" } });
+  return rows.map((r) => ({ code: r.code, percent_off: r.percentOff, active: r.active ? 1 : 0 }));
+}
+
+export async function setDiscountActive(code: string, active: boolean): Promise<void> {
+  await prisma.discountCode.update({
+    where: { code: code.trim().toUpperCase() },
+    data: { active },
+  });
+}

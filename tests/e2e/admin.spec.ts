@@ -13,6 +13,27 @@ test("admin login is required and gates the dashboard", async ({ page }) => {
   await expect(page.getByTestId("login-error")).toBeVisible();
 });
 
+test("admin can create a discount code that applies at checkout", async ({ page, request }) => {
+  await page.goto("/admin/login");
+  await page.getByTestId("admin-email").fill("admin@dreamshappenltd.com");
+  await page.getByTestId("admin-password").fill("changeme");
+  await page.getByTestId("admin-login").click();
+  await expect(page).toHaveURL(/\/admin$/);
+
+  await page.getByTestId("discount-code").fill("E2E25");
+  await page.getByTestId("discount-percent").fill("25");
+  await page.getByTestId("discount-save").click();
+  await expect(page.getByTestId("discount-list")).toContainText("E2E25");
+
+  // The code reduces the cart total via the pricing API.
+  const res = await request.post("/api/cart/price", {
+    data: { slugs: ["architecture-of-life"], code: "E2E25" },
+  });
+  const data = await res.json();
+  expect(data.discountCode).toBe("E2E25");
+  expect(data.discountAmount).toBeGreaterThan(0);
+});
+
 test("admin can publish a dossier with a PDF and it reaches the storefront", async ({ page }) => {
   // Sign in.
   await page.goto("/admin/login");

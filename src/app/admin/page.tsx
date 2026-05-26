@@ -2,9 +2,9 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { isAdmin } from "@/lib/auth";
 import { listProducts } from "@/lib/products";
-import { listSubscribers } from "@/lib/marketing";
+import { listSubscribers, listDiscounts } from "@/lib/marketing";
 import { formatMoney } from "@/lib/money";
-import { logoutAction, deleteProductAction } from "./actions";
+import { logoutAction, deleteProductAction, saveDiscountAction, toggleDiscountAction } from "./actions";
 
 export const metadata = { title: "Admin dashboard", robots: { index: false } };
 export const dynamic = "force-dynamic";
@@ -14,6 +14,7 @@ export default async function AdminDashboard() {
 
   const products = await listProducts({ includeUnpublished: true });
   const subscribers = await listSubscribers();
+  const discounts = await listDiscounts();
 
   return (
     <section className="mx-auto max-w-5xl px-6 py-16">
@@ -69,6 +70,50 @@ export default async function AdminDashboard() {
           </div>
         ))}
         {products.length === 0 && <p className="py-6 text-stone">No dossiers yet.</p>}
+      </div>
+
+      {/* Marketing & sales: discount codes */}
+      <h2 className="mt-16 font-display text-2xl">Discount codes</h2>
+      <p className="mt-2 text-sm text-stone">Percentage codes customers can apply at checkout.</p>
+
+      <form action={saveDiscountAction} className="mt-6 flex flex-wrap items-end gap-3" data-testid="discount-form">
+        <label className="text-sm">
+          <span className="mb-1 block text-stone">Code</span>
+          <input name="code" required placeholder="SUMMER20" data-testid="discount-code"
+            className="w-40 border border-line bg-paper px-3 py-2 uppercase outline-none focus:border-brass" />
+        </label>
+        <label className="text-sm">
+          <span className="mb-1 block text-stone">% off</span>
+          <input name="percent_off" type="number" min="1" max="100" required defaultValue={10} data-testid="discount-percent"
+            className="w-24 border border-line bg-paper px-3 py-2 outline-none focus:border-brass" />
+        </label>
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" name="active" defaultChecked /> Active
+        </label>
+        <button data-testid="discount-save"
+          className="border border-ink bg-ink px-5 py-2.5 text-xs uppercase tracking-[0.2em] text-paper transition hover:bg-transparent hover:text-ink">
+          Save code
+        </button>
+      </form>
+
+      <div className="mt-6 divide-y divide-line border-y border-line" data-testid="discount-list">
+        {discounts.map((d) => (
+          <div key={d.code} className="flex items-center gap-4 py-3 text-sm">
+            <span className="font-mono tabular-nums">{d.code}</span>
+            <span className="text-stone">{d.percent_off}% off</span>
+            <span className={d.active ? "text-brass-deep" : "text-stone"}>
+              {d.active ? "active" : "inactive"}
+            </span>
+            <form action={toggleDiscountAction} className="ml-auto">
+              <input type="hidden" name="code" value={d.code} />
+              <input type="hidden" name="active" value={d.active ? "0" : "1"} />
+              <button className="text-xs uppercase tracking-wider text-ink-soft hover:text-ink">
+                {d.active ? "Deactivate" : "Activate"}
+              </button>
+            </form>
+          </div>
+        ))}
+        {discounts.length === 0 && <p className="py-4 text-stone">No discount codes yet.</p>}
       </div>
     </section>
   );

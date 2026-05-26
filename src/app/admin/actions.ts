@@ -16,6 +16,7 @@ import {
   getProductById,
   type ProductInput,
 } from "@/lib/products";
+import { upsertDiscount, setDiscountActive } from "@/lib/marketing";
 
 export async function loginAction(formData: FormData) {
   const email = String(formData.get("email") || "");
@@ -95,5 +96,23 @@ export async function deleteProductAction(formData: FormData) {
   const id = String(formData.get("id") || "");
   if (id) await deleteProduct(id);
   revalidatePath("/collections");
+  redirect("/admin");
+}
+
+export async function saveDiscountAction(formData: FormData) {
+  if (!(await isAdmin())) redirect("/admin/login");
+  const code = String(formData.get("code") || "").trim();
+  const percent = parseInt(String(formData.get("percent_off") || "0"), 10);
+  if (code && percent > 0 && percent <= 100) {
+    await upsertDiscount(code, percent, formData.get("active") ? true : false);
+  }
+  redirect("/admin");
+}
+
+export async function toggleDiscountAction(formData: FormData) {
+  if (!(await isAdmin())) redirect("/admin/login");
+  const code = String(formData.get("code") || "");
+  const active = String(formData.get("active") || "") === "1";
+  if (code) await setDiscountActive(code, active);
   redirect("/admin");
 }
