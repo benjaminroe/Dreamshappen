@@ -1,5 +1,7 @@
 import { notFound, redirect } from "next/navigation";
-import { getOrder, getOrderItems, markOrderPaid } from "@/lib/orders";
+import { getOrder, getOrderItems } from "@/lib/orders";
+import { fulfillOrder } from "@/lib/fulfillment";
+import { getSiteUrl } from "@/lib/site";
 import { formatMoney } from "@/lib/money";
 
 export const metadata = { title: "Confirm payment", robots: { index: false } };
@@ -11,15 +13,16 @@ export default async function ConfirmPage({
 }) {
   const { order: orderId } = await searchParams;
   if (!orderId) notFound();
-  const order = getOrder(orderId);
+  const order = await getOrder(orderId);
   if (!order) notFound();
   if (order.status === "paid") redirect(`/checkout/success?order=${orderId}`);
 
-  const items = getOrderItems(orderId);
+  const items = await getOrderItems(orderId);
 
   async function pay() {
     "use server";
-    markOrderPaid(orderId!);
+    const siteUrl = await getSiteUrl();
+    await fulfillOrder(orderId!, siteUrl);
     redirect(`/checkout/success?order=${orderId}`);
   }
 

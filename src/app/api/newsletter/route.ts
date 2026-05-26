@@ -16,7 +16,7 @@ export async function POST(req: Request) {
     );
   }
   const { email, source } = parsed.data;
-  const added = addSubscriber(email, source || "footer");
+  const added = await addSubscriber(email, source || "footer");
   return NextResponse.json({
     ok: true,
     message: added ? "You are on the list." : "You are already subscribed.",

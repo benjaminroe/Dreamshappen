@@ -1,35 +1,36 @@
-import { getDb } from "./db";
+import { prisma } from "./prisma";
 
 // --- Marketing: newsletter / lead capture -------------------------------
-export function addSubscriber(email: string, source = "footer"): boolean {
+export async function addSubscriber(email: string, source = "footer"): Promise<boolean> {
   const normalized = email.trim().toLowerCase();
-  const result = getDb()
-    .prepare("INSERT OR IGNORE INTO subscribers (email, source) VALUES (?, ?)")
-    .run(normalized, source);
-  return result.changes > 0;
+  const existing = await prisma.subscriber.findUnique({ where: { email: normalized } });
+  if (existing) return false;
+  await prisma.subscriber.create({ data: { email: normalized, source } });
+  return true;
 }
 
-export function listSubscribers(): { email: string; source: string; created_at: string }[] {
-  return getDb()
-    .prepare("SELECT email, source, created_at FROM subscribers ORDER BY created_at DESC")
-    .all() as { email: string; source: string; created_at: string }[];
+export async function listSubscribers(): Promise<
+  { email: string; source: string; created_at: string }[]
+> {
+  const rows = await prisma.subscriber.findMany({ orderBy: { createdAt: "desc" } });
+  return rows.map((r) => ({ email: r.email, source: r.source, created_at: r.createdAt.toISOString() }));
 }
 
 // --- Sales: discount codes ----------------------------------------------
 export type Discount = { code: string; percent_off: number; active: number };
 
-export function lookupDiscount(code: string): Discount | undefined {
-  const row = getDb()
-    .prepare("SELECT * FROM discount_codes WHERE code = ? AND active = 1")
-    .get(code.trim().toUpperCase()) as Discount | undefined;
-  return row;
+export async function lookupDiscount(code: string): Promise<Discount | undefined> {
+  const row = await prisma.discountCode.findFirst({
+    where: { code: code.trim().toUpperCase(), active: true },
+  });
+  return row ? { code: row.code, percent_off: row.percentOff, active: row.active ? 1 : 0 } : undefined;
 }
 
-export function upsertDiscount(code: string, percentOff: number, active = 1): void {
-  getDb()
-    .prepare(
-      `INSERT INTO discount_codes (code, percent_off, active) VALUES (?, ?, ?)
-       ON CONFLICT(code) DO UPDATE SET percent_off = excluded.percent_off, active = excluded.active`
-    )
-    .run(code.trim().toUpperCase(), percentOff, active);
+export async function upsertDiscount(code: string, percentOff: number, active = true): Promise<void> {
+  const normalized = code.trim().toUpperCase();
+  await prisma.discountCode.upsert({
+    where: { code: normalized },
+    create: { code: normalized, percentOff, active },
+    update: { percentOff, active },
+  });
 }

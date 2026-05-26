@@ -16,7 +16,7 @@ export async function POST(req: Request) {
   }
   const { email, slugs, code } = parsed.data;
 
-  const cart = priceCart(
+  const cart = await priceCart(
     slugs.map((slug) => ({ slug, quantity: 1 })),
     code ?? null
   );
@@ -24,7 +24,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "None of the selected items are available." }, { status: 400 });
   }
 
-  const order = createOrder(email, cart, null);
+  const order = await createOrder(email, cart, null);
   // Use the live request origin so Stripe redirect URLs are always correct at
   // runtime (NEXT_PUBLIC_* values are inlined at build time and can be stale).
   const siteUrl = new URL(req.url).origin;

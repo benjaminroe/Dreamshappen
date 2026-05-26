@@ -1,11 +1,7 @@
-import { mkdirSync, writeFileSync } from "node:fs";
-import path from "node:path";
-import { getDb } from "../src/lib/db";
+import { prisma } from "../src/lib/prisma";
 import { createProduct, listProducts } from "../src/lib/products";
 import { upsertDiscount } from "../src/lib/marketing";
 import { buildPdf } from "../src/lib/pdf";
-
-const PDF_DIR = path.join(process.cwd(), "private", "pdfs");
 
 type Seed = {
   slug: string;
@@ -103,34 +99,38 @@ const seeds: Seed[] = [
   },
 ];
 
-function run() {
-  const db = getDb();
-  mkdirSync(PDF_DIR, { recursive: true });
-
-  // SEED_RESET clears existing data first — used by the e2e suite to get a
-  // deterministic database without deleting the file the server has open.
+async function run() {
+  // SEED_RESET clears existing data first — used by the e2e suite for a
+  // deterministic database.
   if (process.env.SEED_RESET === "1") {
-    db.exec(
-      "DELETE FROM download_grants; DELETE FROM order_items; DELETE FROM orders; DELETE FROM products; DELETE FROM subscribers; DELETE FROM discount_codes;"
-    );
+    await prisma.downloadGrant.deleteMany();
+    await prisma.orderItem.deleteMany();
+    await prisma.order.deleteMany();
+    await prisma.product.deleteMany();
+    await prisma.subscriber.deleteMany();
+    await prisma.discountCode.deleteMany();
     console.log("• reset: cleared existing data");
   }
 
-  const existing = new Set(listProducts({ includeUnpublished: true }).map((p) => p.slug));
+  const existing = new Set(
+    (await listProducts({ includeUnpublished: true })).map((p) => p.slug)
+  );
 
-  seeds.forEach((s, idx) => {
-    const pdfName = `${s.slug}.pdf`;
-    writeFileSync(
-      path.join(PDF_DIR, pdfName),
-      buildPdf(s.title, [s.subtitle, ...s.body, "© Dreams Happen Ltd — Dubai, UAE. Licensed to the purchaser for personal use."])
-    );
+  let idx = 0;
+  for (const s of seeds) {
+    const pdfData = buildPdf(s.title, [
+      s.subtitle,
+      ...s.body,
+      "© Dreams Happen Ltd — Dubai, UAE. Licensed to the purchaser for personal use.",
+    ]);
 
     if (existing.has(s.slug)) {
-      console.log(`• ${s.slug} already exists — skipped (PDF refreshed)`);
-      return;
+      console.log(`• ${s.slug} already exists — skipped`);
+      idx++;
+      continue;
     }
 
-    createProduct({
+    await createProduct({
       slug: s.slug,
       title: s.title,
       subtitle: s.subtitle,
@@ -139,16 +139,24 @@ function run() {
       price: s.price,
       cover_accent: s.cover_accent,
       pages: s.pages,
-      pdf_filename: pdfName,
+      pdf_filename: `${s.slug}.pdf`,
+      pdfData,
       published: 1,
       sort_order: idx,
     });
     console.log(`✓ seeded ${s.slug}`);
-  });
+    idx++;
+  }
 
-  upsertDiscount("WELCOME10", 10, 1);
+  await upsertDiscount("WELCOME10", 10, true);
   console.log("✓ discount code WELCOME10 (10% off) ready");
   console.log("Done.");
 }
 
-run();
+run()
+  .then(() => prisma.$disconnect())
+  .catch(async (err) => {
+    console.error(err);
+    await prisma.$disconnect();
+    process.exit(1);
+  });

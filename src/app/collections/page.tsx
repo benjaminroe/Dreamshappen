@@ -10,8 +10,8 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
-export default function CollectionsPage() {
-  const products = listProducts();
+export default async function CollectionsPage() {
+  const products = await listProducts();
 
   return (
     <section className="mx-auto max-w-6xl px-6 py-20">

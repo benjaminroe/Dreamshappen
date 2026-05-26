@@ -12,8 +12,8 @@ export const dynamic = "force-dynamic";
 export default async function AdminDashboard() {
   if (!(await isAdmin())) redirect("/admin/login");
 
-  const products = listProducts({ includeUnpublished: true });
-  const subscribers = listSubscribers();
+  const products = await listProducts({ includeUnpublished: true });
+  const subscribers = await listSubscribers();
 
   return (
     <section className="mx-auto max-w-5xl px-6 py-16">

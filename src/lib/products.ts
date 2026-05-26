@@ -1,25 +1,83 @@
-import { getDb } from "./db";
+import { prisma } from "./prisma";
 import type { Product } from "./types";
-import { randomUUID } from "node:crypto";
+import type { Prisma } from "@prisma/client";
 
-export function listProducts(opts: { includeUnpublished?: boolean } = {}): Product[] {
-  const db = getDb();
-  const where = opts.includeUnpublished ? "" : "WHERE published = 1";
-  return db
-    .prepare(`SELECT * FROM products ${where} ORDER BY sort_order ASC, created_at ASC`)
-    .all() as Product[];
+// Public select — never ships the PDF bytes to list/detail views.
+const productSelect = {
+  id: true,
+  slug: true,
+  title: true,
+  subtitle: true,
+  collection: true,
+  description: true,
+  price: true,
+  currency: true,
+  coverAccent: true,
+  pages: true,
+  pdfFilename: true,
+  stripeProductId: true,
+  stripePriceId: true,
+  published: true,
+  sortOrder: true,
+  createdAt: true,
+} satisfies Prisma.ProductSelect;
+
+type Row = Prisma.ProductGetPayload<{ select: typeof productSelect }>;
+
+function toProduct(row: Row): Product {
+  return {
+    id: row.id,
+    slug: row.slug,
+    title: row.title,
+    subtitle: row.subtitle,
+    collection: row.collection,
+    description: row.description,
+    price: row.price,
+    currency: row.currency,
+    cover_accent: row.coverAccent,
+    pages: row.pages,
+    pdf_filename: row.pdfFilename,
+    stripe_product_id: row.stripeProductId,
+    stripe_price_id: row.stripePriceId,
+    published: row.published ? 1 : 0,
+    sort_order: row.sortOrder,
+    created_at: row.createdAt.toISOString(),
+  };
 }
 
-export function getProductBySlug(slug: string): Product | undefined {
-  return getDb().prepare("SELECT * FROM products WHERE slug = ?").get(slug) as
-    | Product
-    | undefined;
+export async function listProducts(
+  opts: { includeUnpublished?: boolean } = {}
+): Promise<Product[]> {
+  const rows = await prisma.product.findMany({
+    where: opts.includeUnpublished ? {} : { published: true },
+    orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+    select: productSelect,
+  });
+  return rows.map(toProduct);
 }
 
-export function getProductById(id: string): Product | undefined {
-  return getDb().prepare("SELECT * FROM products WHERE id = ?").get(id) as
-    | Product
-    | undefined;
+export async function getProductBySlug(slug: string): Promise<Product | undefined> {
+  const row = await prisma.product.findUnique({ where: { slug }, select: productSelect });
+  return row ? toProduct(row) : undefined;
+}
+
+export async function getProductById(id: string): Promise<Product | undefined> {
+  const row = await prisma.product.findUnique({ where: { id }, select: productSelect });
+  return row ? toProduct(row) : undefined;
+}
+
+export async function getProductPdf(
+  id: string
+): Promise<{ data: Buffer; filename: string } | null> {
+  const row = await prisma.product.findUnique({
+    where: { id },
+    select: { pdfData: true, pdfFilename: true, slug: true },
+  });
+  if (!row?.pdfData) return null;
+  return {
+    data: Buffer.from(row.pdfData),
+    filename: row.pdfFilename || `${row.slug}.pdf`,
+  };
 }
 
 export type ProductInput = {
@@ -32,31 +90,67 @@ export type ProductInput = {
   cover_accent: string;
   pages: number;
   pdf_filename: string | null;
+  pdfData?: Buffer | null;
   published: number;
   sort_order: number;
 };
 
-export function createProduct(input: ProductInput): Product {
-  const db = getDb();
-  const id = randomUUID();
-  db.prepare(
-    `INSERT INTO products (id, slug, title, subtitle, collection, description, price, currency, cover_accent, pages, pdf_filename, published, sort_order)
-     VALUES (@id, @slug, @title, @subtitle, @collection, @description, @price, 'AED', @cover_accent, @pages, @pdf_filename, @published, @sort_order)`
-  ).run({ id, ...input });
-  return getProductById(id)!;
+export async function createProduct(input: ProductInput): Promise<Product> {
+  const row = await prisma.product.create({
+    data: {
+      slug: input.slug,
+      title: input.title,
+      subtitle: input.subtitle,
+      collection: input.collection,
+      description: input.description,
+      price: input.price,
+      currency: "AED",
+      coverAccent: input.cover_accent,
+      pages: input.pages,
+      pdfFilename: input.pdf_filename,
+      pdfData: input.pdfData ? new Uint8Array(input.pdfData) : null,
+      published: input.published === 1,
+      sortOrder: input.sort_order,
+    },
+    select: productSelect,
+  });
+  return toProduct(row);
 }
 
-export function updateProduct(id: string, input: ProductInput): Product | undefined {
-  const db = getDb();
-  db.prepare(
-    `UPDATE products SET slug=@slug, title=@title, subtitle=@subtitle, collection=@collection,
-       description=@description, price=@price, cover_accent=@cover_accent, pages=@pages,
-       pdf_filename=@pdf_filename, published=@published, sort_order=@sort_order
-     WHERE id=@id`
-  ).run({ id, ...input });
-  return getProductById(id);
+export async function updateProduct(
+  id: string,
+  input: ProductInput
+): Promise<Product | undefined> {
+  const row = await prisma.product.update({
+    where: { id },
+    data: {
+      slug: input.slug,
+      title: input.title,
+      subtitle: input.subtitle,
+      collection: input.collection,
+      description: input.description,
+      price: input.price,
+      coverAccent: input.cover_accent,
+      pages: input.pages,
+      pdfFilename: input.pdf_filename,
+      // Only replace the stored PDF when a new one was uploaded.
+      ...(input.pdfData ? { pdfData: new Uint8Array(input.pdfData) } : {}),
+      published: input.published === 1,
+      sortOrder: input.sort_order,
+    },
+    select: productSelect,
+  });
+  return toProduct(row);
 }
 
-export function deleteProduct(id: string): void {
-  getDb().prepare("DELETE FROM products WHERE id = ?").run(id);
+export async function deleteProduct(id: string): Promise<void> {
+  await prisma.product.delete({ where: { id } });
+}
+
+export async function setStripeIds(
+  id: string,
+  stripeProductId: string,
+  stripePriceId: string
+): Promise<void> {
+  await prisma.product.update({ where: { id }, data: { stripeProductId, stripePriceId } });
 }

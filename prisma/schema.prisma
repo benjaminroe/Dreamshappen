@@ -1,0 +1,91 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Product {
+  id              String          @id @default(uuid())
+  slug            String          @unique
+  title           String
+  subtitle        String          @default("")
+  collection      String          @default("The Collections")
+  description     String          @default("")
+  price           Int             @default(0) // minor units (fils)
+  currency        String          @default("AED")
+  coverAccent     String          @default("#1f2937") @map("cover_accent")
+  pages           Int             @default(0)
+  pdfData         Bytes?          @map("pdf_data")
+  pdfFilename     String?         @map("pdf_filename")
+  stripeProductId String?         @map("stripe_product_id")
+  stripePriceId   String?         @map("stripe_price_id")
+  published       Boolean         @default(true)
+  sortOrder       Int             @default(0) @map("sort_order")
+  createdAt       DateTime        @default(now()) @map("created_at")
+  orderItems      OrderItem[]
+  grants          DownloadGrant[]
+
+  @@map("products")
+}
+
+model Order {
+  id              String          @id @default(uuid())
+  email           String
+  status          String          @default("pending") // pending | paid | cancelled
+  total           Int             @default(0)
+  currency        String          @default("AED")
+  discountCode    String?         @map("discount_code")
+  stripeSessionId String?         @map("stripe_session_id")
+  emailedAt       DateTime?       @map("emailed_at")
+  createdAt       DateTime        @default(now()) @map("created_at")
+  items           OrderItem[]
+  grants          DownloadGrant[]
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id        String  @id @default(uuid())
+  orderId   String  @map("order_id")
+  productId String  @map("product_id")
+  title     String
+  price     Int
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product   Product @relation(fields: [productId], references: [id])
+
+  @@map("order_items")
+}
+
+model DownloadGrant {
+  id            String   @id @default(uuid())
+  token         String   @unique
+  orderId       String   @map("order_id")
+  productId     String   @map("product_id")
+  downloadCount Int      @default(0) @map("download_count")
+  createdAt     DateTime @default(now()) @map("created_at")
+  order         Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product       Product  @relation(fields: [productId], references: [id])
+
+  @@map("download_grants")
+}
+
+model Subscriber {
+  email     String   @id
+  source    String   @default("footer")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("subscribers")
+}
+
+model DiscountCode {
+  code       String  @id
+  percentOff Int     @map("percent_off")
+  active     Boolean @default(true)
+
+  @@map("discount_codes")
+}

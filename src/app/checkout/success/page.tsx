@@ -1,11 +1,8 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import {
-  getOrder,
-  getGrantsForOrder,
-  markOrderPaid,
-  productForGrant,
-} from "@/lib/orders";
+import { getOrder, getGrantsForOrder, productForGrant } from "@/lib/orders";
+import { fulfillOrder } from "@/lib/fulfillment";
+import { getSiteUrl } from "@/lib/site";
 import { stripe } from "@/lib/stripe";
 import { formatMoney } from "@/lib/money";
 import CartClearer from "@/components/CartClearer";
@@ -19,18 +16,20 @@ export default async function SuccessPage({
 }) {
   const { order: orderId, session_id } = await searchParams;
   if (!orderId) notFound();
-  let order = getOrder(orderId);
+  let order = await getOrder(orderId);
   if (!order) notFound();
 
   // With a live Stripe key, verify the session is paid before granting access.
   if (order.status !== "paid" && stripe && session_id) {
     try {
       const session = await stripe.checkout.sessions.retrieve(session_id);
-      if (session.payment_status === "paid") markOrderPaid(orderId);
+      if (session.payment_status === "paid") {
+        await fulfillOrder(orderId, await getSiteUrl());
+      }
     } catch {
       /* fall through to processing state */
     }
-    order = getOrder(orderId)!;
+    order = (await getOrder(orderId))!;
   }
 
   if (order.status !== "paid") {
@@ -46,7 +45,15 @@ export default async function SuccessPage({
     );
   }
 
-  const grants = getGrantsForOrder(orderId);
+  const grants = await getGrantsForOrder(orderId);
+  const downloads = (
+    await Promise.all(
+      grants.map(async (g) => {
+        const product = await productForGrant(g);
+        return product ? { token: g.token, title: product.title, pages: product.pages } : null;
+      })
+    )
+  ).filter((d): d is { token: string; title: string; pages: number } => d !== null);
 
   return (
     <section className="mx-auto max-w-2xl px-6 py-20">
@@ -60,25 +67,21 @@ export default async function SuccessPage({
       </p>
 
       <ul className="mt-12 divide-y divide-line border-y border-line" data-testid="download-list">
-        {grants.map((g) => {
-          const product = productForGrant(g);
-          if (!product) return null;
-          return (
-            <li key={g.token} className="flex items-center justify-between gap-4 py-5">
-              <div>
-                <p className="font-display text-lg">{product.title}</p>
-                <p className="text-sm text-stone">{product.pages} pages · PDF</p>
-              </div>
-              <a
-                href={`/api/download/${g.token}`}
-                data-testid="download-link"
-                className="border border-ink px-6 py-2.5 text-xs uppercase tracking-[0.2em] transition hover:bg-ink hover:text-paper"
-              >
-                Download
-              </a>
-            </li>
-          );
-        })}
+        {downloads.map((d) => (
+          <li key={d.token} className="flex items-center justify-between gap-4 py-5">
+            <div>
+              <p className="font-display text-lg">{d.title}</p>
+              <p className="text-sm text-stone">{d.pages} pages · PDF</p>
+            </div>
+            <a
+              href={`/api/download/${d.token}`}
+              data-testid="download-link"
+              className="border border-ink px-6 py-2.5 text-xs uppercase tracking-[0.2em] transition hover:bg-ink hover:text-paper"
+            >
+              Download
+            </a>
+          </li>
+        ))}
       </ul>
 
       <div className="mt-10 flex items-center justify-between text-sm">

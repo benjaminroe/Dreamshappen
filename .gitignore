@@ -8,17 +8,12 @@
 # production
 /build
 
-# local data & secrets
+# local secrets
 /.env
 /.env*.local
-/data/*.db
-/data/*.db-journal
-/data/*.db-wal
-/data/*.db-shm
 
-# generated / uploaded content (recreated by `npm run seed` or the admin CMS)
-/private/pdfs/*
-!/private/pdfs/.gitkeep
+# prisma
+/prisma/*.db
 
 # playwright
 /test-results/

@@ -14,7 +14,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
   const { slugs, code } = parsed.data;
-  const cart = priceCart(
+  const cart = await priceCart(
     slugs.map((slug) => ({ slug, quantity: 1 })),
     code ?? null
   );

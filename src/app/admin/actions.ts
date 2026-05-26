@@ -3,8 +3,6 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { writeFile, mkdir } from "node:fs/promises";
-import path from "node:path";
 import {
   verifyAdminCredentials,
   adminSessionToken,
@@ -18,8 +16,6 @@ import {
   getProductById,
   type ProductInput,
 } from "@/lib/products";
-
-const PDF_DIR = path.join(process.cwd(), "private", "pdfs");
 
 export async function loginAction(formData: FormData) {
   const email = String(formData.get("email") || "");
@@ -52,13 +48,9 @@ function slugify(input: string): string {
     .slice(0, 80);
 }
 
-async function saveUploadedPdf(slug: string, file: File | null): Promise<string | null> {
+async function readUploadedPdf(file: File | null): Promise<Buffer | null> {
   if (!file || typeof file.arrayBuffer !== "function" || file.size === 0) return null;
-  await mkdir(PDF_DIR, { recursive: true });
-  const filename = `${slug}.pdf`;
-  const buffer = Buffer.from(await file.arrayBuffer());
-  await writeFile(path.join(PDF_DIR, path.basename(filename)), buffer);
-  return filename;
+  return Buffer.from(await file.arrayBuffer());
 }
 
 export async function saveProductAction(formData: FormData) {
@@ -68,9 +60,9 @@ export async function saveProductAction(formData: FormData) {
   const title = String(formData.get("title") || "").trim();
   const slug = slugify(String(formData.get("slug") || title));
   const priceMajor = parseFloat(String(formData.get("price") || "0"));
-  const existing = id ? getProductById(id) : undefined;
+  const existing = id ? await getProductById(id) : undefined;
 
-  const uploaded = await saveUploadedPdf(slug, formData.get("pdf") as File | null);
+  const pdfData = await readUploadedPdf(formData.get("pdf") as File | null);
 
   const input: ProductInput = {
     slug,
@@ -81,15 +73,16 @@ export async function saveProductAction(formData: FormData) {
     price: Math.max(0, Math.round((isNaN(priceMajor) ? 0 : priceMajor) * 100)),
     cover_accent: String(formData.get("cover_accent") || "#1f2937"),
     pages: parseInt(String(formData.get("pages") || "0"), 10) || 0,
-    pdf_filename: uploaded ?? existing?.pdf_filename ?? null,
+    pdf_filename: pdfData ? `${slug}.pdf` : existing?.pdf_filename ?? null,
+    pdfData,
     published: formData.get("published") ? 1 : 0,
     sort_order: parseInt(String(formData.get("sort_order") || "0"), 10) || 0,
   };
 
   if (id && existing) {
-    updateProduct(id, input);
+    await updateProduct(id, input);
   } else {
-    createProduct(input);
+    await createProduct(input);
   }
 
   revalidatePath("/collections");
@@ -100,7 +93,7 @@ export async function saveProductAction(formData: FormData) {
 export async function deleteProductAction(formData: FormData) {
   if (!(await isAdmin())) redirect("/admin/login");
   const id = String(formData.get("id") || "");
-  if (id) deleteProduct(id);
+  if (id) await deleteProduct(id);
   revalidatePath("/collections");
   redirect("/admin");
 }

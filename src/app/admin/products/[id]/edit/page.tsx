@@ -14,7 +14,7 @@ export default async function EditProductPage({
 }) {
   if (!(await isAdmin())) redirect("/admin/login");
   const { id } = await params;
-  const product = getProductById(id);
+  const product = await getProductById(id);
   if (!product) notFound();
 
   return (

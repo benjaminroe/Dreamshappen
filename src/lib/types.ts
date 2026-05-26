@@ -10,6 +10,8 @@ export type Product = {
   cover_accent: string;
   pages: number;
   pdf_filename: string | null;
+  stripe_product_id: string | null;
+  stripe_price_id: string | null;
   published: number;
   sort_order: number;
   created_at: string;
@@ -23,6 +25,7 @@ export type Order = {
   currency: string;
   discount_code: string | null;
   stripe_session_id: string | null;
+  emailed_at: string | null;
   created_at: string;
 };
 

@@ -21,20 +21,31 @@ export async function createCheckout(params: {
   const { order_id, email, cart, siteUrl } = params;
 
   if (stripe) {
+    const hasDiscount = cart.discountAmount > 0;
     // Distribute any percentage discount proportionally across line items so
     // the Stripe total matches the order total without needing a Coupon object.
     const factor = cart.subtotal > 0 ? cart.total / cart.subtotal : 1;
-    const session = await stripe.checkout.sessions.create({
-      mode: "payment",
-      customer_email: email,
-      line_items: cart.items.map((i) => ({
+
+    type CreateParams = NonNullable<Parameters<Stripe["checkout"]["sessions"]["create"]>[0]>;
+    const line_items: CreateParams["line_items"] = cart.items.map((i) => {
+      // Use the published Stripe Price when there's no discount to apply.
+      if (!hasDiscount && i.product.stripe_price_id) {
+        return { quantity: 1, price: i.product.stripe_price_id };
+      }
+      return {
         quantity: 1,
         price_data: {
           currency: "aed",
           unit_amount: Math.max(0, Math.round(i.price * factor)),
           product_data: { name: i.product.title, description: i.product.subtitle },
         },
-      })),
+      };
+    });
+
+    const session = await stripe.checkout.sessions.create({
+      mode: "payment",
+      customer_email: email,
+      line_items,
       metadata: { order_id },
       success_url: `${siteUrl}/checkout/success?order=${order_id}&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${siteUrl}/cart?cancelled=1`,
