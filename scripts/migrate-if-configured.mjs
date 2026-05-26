@@ -1,8 +1,11 @@
 import { execSync } from "node:child_process";
+import { normalizeDbEnv } from "./db-env.mjs";
 
 // Runs `prisma migrate deploy` only when a database is configured. This lets a
 // first Vercel deploy succeed before any env vars are set, while automatically
-// applying migrations on later deploys once DATABASE_URL is added.
+// applying migrations on later deploys once a database is added.
+normalizeDbEnv();
+
 if (!process.env.DATABASE_URL) {
   console.log("DATABASE_URL not set — skipping prisma migrate deploy.");
   process.exit(0);
