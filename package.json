@@ -9,6 +9,7 @@
     "start": "next start",
     "lint": "next lint",
     "postinstall": "prisma generate",
+    "generate:pdfs": "tsx scripts/generate-pdfs.ts",
     "seed": "tsx scripts/seed.ts",
     "db:deploy": "prisma migrate deploy",
     "stripe:sync": "tsx scripts/stripe-sync.ts",
