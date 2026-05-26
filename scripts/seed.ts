@@ -20,6 +20,13 @@ async function run() {
     (await listProducts({ includeUnpublished: true })).map((p) => p.slug)
   );
 
+  // SEED_IF_EMPTY is set by the deploy build: seed demo content only on a fresh
+  // database, so products edited or removed via /admin are never resurrected.
+  if (process.env.SEED_IF_EMPTY === "1" && existing.size > 0) {
+    console.log(`• ${existing.size} product(s) already present — skipping seed.`);
+    return;
+  }
+
   let idx = 0;
   for (const s of seeds) {
     const pdfData = pdfBytesFor(s);
