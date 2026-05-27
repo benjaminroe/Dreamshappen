@@ -1,22 +1,33 @@
 import { PrismaClient } from "@prisma/client";
 
-// A Vercel Postgres store injects DATABASE_URL / DATABASE_URL_UNPOOLED plus the
-// POSTGRES_* set, but not DIRECT_URL. Map them to the names the schema expects
-// before the client is constructed so deploys work without manual env wiring.
-// Guarded assignments: writing undefined to process.env stores the string
-// "undefined", so only assign when a real connection string is present.
-const dbUrl =
+// Map every known Vercel/Neon Postgres env-var shape to what Prisma expects:
+//   DATABASE_URL  → pooled connection (runtime queries)
+//   DIRECT_URL    → direct/unpooled connection (migrations)
+//
+// Neon via Vercel Marketplace injects (with the user's chosen prefix, e.g. POSTGRES_):
+//   POSTGRES_PRISMA_URL, POSTGRES_URL, POSTGRES_DATABASE_URL,
+//   POSTGRES_URL_NON_POOLING, POSTGRES_DATABASE_URL_UNPOOLED
+//
+// The old Vercel Postgres product injected:
+//   POSTGRES_PRISMA_URL, POSTGRES_URL, DATABASE_URL_UNPOOLED,
+//   POSTGRES_URL_NON_POOLING
+
+const pooled =
   process.env.POSTGRES_PRISMA_URL ||
   process.env.POSTGRES_URL ||
-  process.env.DATABASE_URL_UNPOOLED ||
-  process.env.POSTGRES_URL_NON_POOLING;
-if (!process.env.DATABASE_URL && dbUrl) process.env.DATABASE_URL = dbUrl;
-
-const directUrl =
+  process.env.POSTGRES_DATABASE_URL ||
   process.env.DATABASE_URL_UNPOOLED ||
   process.env.POSTGRES_URL_NON_POOLING ||
   process.env.DATABASE_URL;
-if (!process.env.DIRECT_URL && directUrl) process.env.DIRECT_URL = directUrl;
+
+const unpooled =
+  process.env.POSTGRES_DATABASE_URL_UNPOOLED ||
+  process.env.POSTGRES_URL_NON_POOLING ||
+  process.env.DATABASE_URL_UNPOOLED ||
+  pooled;
+
+if (!process.env.DATABASE_URL && pooled) process.env.DATABASE_URL = pooled;
+if (!process.env.DIRECT_URL && unpooled) process.env.DIRECT_URL = unpooled;
 
 /** True when a DATABASE_URL is present (from env or mapped Vercel vars). */
 export const hasDatabaseUrl = Boolean(process.env.DATABASE_URL);
