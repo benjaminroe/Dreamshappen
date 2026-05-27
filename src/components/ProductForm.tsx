@@ -1,5 +1,6 @@
 import type { Product } from "@/lib/types";
 import { saveProductAction } from "@/app/admin/actions";
+import { PdfUploadZone } from "./PdfUploadZone";
 
 export default function ProductForm({ product }: { product?: Product }) {
   const priceMajor = product ? (product.price / 100).toFixed(2) : "";
@@ -38,15 +39,7 @@ export default function ProductForm({ product }: { product?: Product }) {
         />
       </label>
 
-      <label className="block text-sm">
-        <span className="mb-2 block text-stone">
-          PDF file {product?.pdf_filename ? `(current: ${product.pdf_filename})` : ""}
-        </span>
-        <input name="pdf" type="file" accept="application/pdf" data-testid="pf-pdf" className="block w-full text-sm" />
-        <span className="mt-1 block text-xs text-stone">
-          This is the gated file delivered to buyers. Leave empty to keep the current file.
-        </span>
-      </label>
+      <PdfUploadZone currentFilename={product?.pdf_filename || null} />
 
       <label className="flex items-center gap-3 text-sm">
         <input type="checkbox" name="published" defaultChecked={product ? product.published === 1 : true} data-testid="pf-published" />

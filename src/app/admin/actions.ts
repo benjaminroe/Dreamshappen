@@ -1,6 +1,6 @@
 "use server";
 
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import {
@@ -16,7 +16,11 @@ import {
   getProductById,
   type ProductInput,
 } from "@/lib/products";
-import { upsertDiscount, setDiscountActive } from "@/lib/marketing";
+import { upsertDiscount, setDiscountActive, listSubscribers } from "@/lib/marketing";
+import { markOrderPaid, markOrderEmailed, getOrder, getGrantsForOrder, productForGrant } from "@/lib/orders";
+import { sendOrderConfirmation } from "@/lib/email";
+import { formatMoney } from "@/lib/money";
+import { prisma } from "@/lib/prisma";
 
 export async function loginAction(formData: FormData) {
   const email = String(formData.get("email") || "");
@@ -88,7 +92,8 @@ export async function saveProductAction(formData: FormData) {
 
   revalidatePath("/collections");
   revalidatePath("/");
-  redirect("/admin");
+  revalidatePath("/admin");
+  redirect("/admin/products");
 }
 
 export async function deleteProductAction(formData: FormData) {
@@ -96,7 +101,8 @@ export async function deleteProductAction(formData: FormData) {
   const id = String(formData.get("id") || "");
   if (id) await deleteProduct(id);
   revalidatePath("/collections");
-  redirect("/admin");
+  revalidatePath("/admin");
+  redirect("/admin/products");
 }
 
 export async function saveDiscountAction(formData: FormData) {
@@ -106,7 +112,8 @@ export async function saveDiscountAction(formData: FormData) {
   if (code && percent > 0 && percent <= 100) {
     await upsertDiscount(code, percent, formData.get("active") ? true : false);
   }
-  redirect("/admin");
+  revalidatePath("/admin/discounts");
+  redirect("/admin/discounts");
 }
 
 export async function toggleDiscountAction(formData: FormData) {
@@ -114,5 +121,100 @@ export async function toggleDiscountAction(formData: FormData) {
   const code = String(formData.get("code") || "");
   const active = String(formData.get("active") || "") === "1";
   if (code) await setDiscountActive(code, active);
-  redirect("/admin");
+  revalidatePath("/admin/discounts");
+  redirect("/admin/discounts");
+}
+
+export async function deleteDiscountAction(formData: FormData) {
+  if (!(await isAdmin())) redirect("/admin/login");
+  const code = String(formData.get("code") || "").trim().toUpperCase();
+  if (code) {
+    await prisma.discountCode.delete({ where: { code } });
+  }
+  revalidatePath("/admin/discounts");
+  redirect("/admin/discounts");
+}
+
+export async function markPaidAction(formData: FormData) {
+  if (!(await isAdmin())) redirect("/admin/login");
+  const id = String(formData.get("id") || "");
+  if (!id) redirect("/admin/orders");
+
+  const grants = await markOrderPaid(id);
+  const order = await getOrder(id);
+
+  if (order && order.status === "paid" && !order.emailed_at) {
+    const h = await headers();
+    const proto = h.get("x-forwarded-proto") || "https";
+    const host = h.get("host") || "localhost:3000";
+    const siteUrl = `${proto}://${host}`;
+
+    const links: { title: string; url: string }[] = [];
+    for (const grant of grants) {
+      const product = await productForGrant(grant);
+      if (product) links.push({ title: product.title, url: `${siteUrl}/api/download/${grant.token}` });
+    }
+
+    await markOrderEmailed(id);
+    await sendOrderConfirmation({
+      to: order.email,
+      orderId: order.id,
+      total: formatMoney(order.total, order.currency),
+      links,
+    });
+  }
+
+  revalidatePath("/admin/orders");
+  revalidatePath("/admin");
+  redirect(`/admin/orders/${id}`);
+}
+
+export async function cancelOrderAction(formData: FormData) {
+  if (!(await isAdmin())) redirect("/admin/login");
+  const id = String(formData.get("id") || "");
+  if (id) {
+    await prisma.order.update({ where: { id }, data: { status: "cancelled" } });
+  }
+  revalidatePath("/admin/orders");
+  revalidatePath("/admin");
+  redirect(`/admin/orders/${id}`);
+}
+
+export async function resendEmailAction(formData: FormData) {
+  if (!(await isAdmin())) redirect("/admin/login");
+  const id = String(formData.get("id") || "");
+  if (!id) redirect("/admin/orders");
+
+  const order = await getOrder(id);
+  if (!order || order.status !== "paid") redirect(`/admin/orders/${id}`);
+
+  const grants = await getGrantsForOrder(id);
+  const h = await headers();
+  const proto = h.get("x-forwarded-proto") || "https";
+  const host = h.get("host") || "localhost:3000";
+  const siteUrl = `${proto}://${host}`;
+
+  const links: { title: string; url: string }[] = [];
+  for (const grant of grants) {
+    const product = await productForGrant(grant);
+    if (product) links.push({ title: product.title, url: `${siteUrl}/api/download/${grant.token}` });
+  }
+
+  await sendOrderConfirmation({
+    to: order.email,
+    orderId: order.id,
+    total: formatMoney(order.total, order.currency),
+    links,
+  });
+
+  revalidatePath(`/admin/orders/${id}`);
+  redirect(`/admin/orders/${id}`);
+}
+
+export async function exportSubscribersAction() {
+  if (!(await isAdmin())) redirect("/admin/login");
+  const subscribers = await listSubscribers();
+  const csv = ["email,source,subscribed_at", ...subscribers.map((s) => `${s.email},${s.source},${s.created_at}`)].join("\n");
+  const encoded = Buffer.from(csv).toString("base64");
+  redirect(`/api/admin/export-subscribers?data=${encoded}`);
 }

@@ -4,7 +4,7 @@ import { isAdmin } from "@/lib/auth";
 import { getProductById } from "@/lib/products";
 import ProductForm from "@/components/ProductForm";
 
-export const metadata = { title: "Edit dossier", robots: { index: false } };
+export const metadata = { title: "Admin — Edit dossier", robots: { index: false } };
 export const dynamic = "force-dynamic";
 
 export default async function EditProductPage({
@@ -18,14 +18,15 @@ export default async function EditProductPage({
   if (!product) notFound();
 
   return (
-    <section className="mx-auto max-w-2xl px-6 py-16">
-      <Link href="/admin" className="text-sm text-stone link-underline">
-        ← Back to dashboard
+    <div className="px-8 py-10 max-w-2xl">
+      <Link href="/admin/products" className="text-sm text-stone link-underline">
+        ← All products
       </Link>
-      <h1 className="mt-5 font-display text-3xl">Edit · {product.title}</h1>
-      <div className="mt-10">
+      <p className="mt-6 eyebrow">Catalog</p>
+      <h1 className="mt-2 font-display text-3xl">Edit · {product.title}</h1>
+      <div className="mt-8">
         <ProductForm product={product} />
       </div>
-    </section>
+    </div>
   );
 }
