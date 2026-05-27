@@ -12,11 +12,13 @@ const nav = [
 export default function Header() {
   const { count, ready } = useCart();
   return (
-    <header className="sticky top-0 z-40 border-b border-line/70 bg-paper/85 backdrop-blur">
+    <header className="sticky top-0 z-40 glass">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
-        <Link href="/" className="leading-none">
-          <span className="block font-display text-xl tracking-tight">Dreams Happen</span>
-          <span className="mt-0.5 block text-[0.6rem] uppercase tracking-[0.34em] text-stone">
+        <Link href="/" className="group leading-none">
+          <span className="block font-display text-2xl font-extrabold tracking-tight transition-colors group-hover:text-brass">
+            Dreams Happen
+          </span>
+          <span className="mt-0.5 block text-[0.6rem] font-semibold uppercase tracking-[0.34em] text-stone transition-colors group-hover:text-brass/70">
             Strategic Frameworks
           </span>
         </Link>
@@ -26,7 +28,7 @@ export default function Header() {
             <Link
               key={n.href}
               href={n.href}
-              className="link-underline text-sm tracking-wide text-ink-soft hover:text-ink"
+              className="link-underline text-sm tracking-wide text-ink-soft transition-colors hover:text-brass"
             >
               {n.label}
             </Link>
@@ -35,13 +37,13 @@ export default function Header() {
 
         <Link
           href="/cart"
-          className="group flex items-center gap-2 text-sm tracking-wide text-ink-soft hover:text-ink"
+          className="group flex items-center gap-2.5 text-sm tracking-wide text-ink-soft transition-colors hover:text-brass"
           aria-label="Cart"
         >
           <span className="link-underline">Cart</span>
           <span
             data-testid="cart-count"
-            className="inline-flex h-6 min-w-6 items-center justify-center rounded-full border border-line px-1.5 text-xs tabular-nums text-ink"
+            className="inline-flex h-6 min-w-6 items-center justify-center rounded-full border border-brass/30 bg-brass/5 px-1.5 text-xs tabular-nums text-brass transition-all group-hover:border-brass/60 group-hover:bg-brass/10"
           >
             {ready ? count : 0}
           </span>

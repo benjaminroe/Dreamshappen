@@ -34,13 +34,16 @@ export default async function SuccessPage({
 
   if (order.status !== "paid") {
     return (
-      <section className="mx-auto max-w-lg px-6 py-28 text-center">
-        <p className="eyebrow">Almost there</p>
-        <h1 className="mt-4 font-display text-3xl">Confirming your payment…</h1>
-        <p className="mt-4 text-ink-soft">
-          Your payment is being confirmed. This page will show your download links once it clears —
-          please refresh in a moment.
-        </p>
+      <section className="relative mx-auto max-w-lg px-6 py-32 text-center">
+        <div className="pointer-events-none absolute inset-0 bg-radial-glow" />
+        <div className="relative">
+          <p className="eyebrow">Almost there</p>
+          <h1 className="mt-4 font-display text-4xl font-bold">Confirming your payment...</h1>
+          <p className="mt-4 text-ink-soft">
+            Your payment is being confirmed. This page will show your download links once it clears —
+            please refresh in a moment.
+          </p>
+        </div>
       </section>
     );
   }
@@ -56,39 +59,47 @@ export default async function SuccessPage({
   ).filter((d): d is { token: string; title: string; pages: number } => d !== null);
 
   return (
-    <section className="mx-auto max-w-2xl px-6 py-20">
-      <CartClearer />
-      <p className="eyebrow">Payment received</p>
-      <h1 className="mt-5 font-display text-4xl">Your dossiers are ready</h1>
-      <p className="mt-5 leading-relaxed text-ink-soft">
-        Thank you. A perpetual licence has been granted to{" "}
-        <span className="text-ink">{order.email}</span>. Download your files below — your links
-        remain available on this confirmation.
-      </p>
+    <section className="relative mx-auto max-w-2xl px-6 py-24">
+      <div className="pointer-events-none absolute inset-0 bg-radial-glow" />
+      <div className="relative">
+        <CartClearer />
+        <p className="eyebrow flex items-center gap-3">
+          <span className="gold-bar" />
+          Payment received
+        </p>
+        <h1 className="mask-reveal mt-6 font-display text-5xl font-extrabold">
+          <span className="gradient-text">Your dossiers are ready</span>
+        </h1>
+        <p className="mt-6 leading-relaxed text-ink-soft">
+          Thank you. A perpetual licence has been granted to{" "}
+          <span className="text-brass">{order.email}</span>. Download your files below — your links
+          remain available on this confirmation.
+        </p>
 
-      <ul className="mt-12 divide-y divide-line border-y border-line" data-testid="download-list">
-        {downloads.map((d) => (
-          <li key={d.token} className="flex items-center justify-between gap-4 py-5">
-            <div>
-              <p className="font-display text-lg">{d.title}</p>
-              <p className="text-sm text-stone">{d.pages} pages · PDF</p>
-            </div>
-            <a
-              href={`/api/download/${d.token}`}
-              data-testid="download-link"
-              className="border border-ink px-6 py-2.5 text-xs uppercase tracking-[0.2em] transition hover:bg-ink hover:text-paper"
-            >
-              Download
-            </a>
-          </li>
-        ))}
-      </ul>
+        <ul className="mt-12 divide-y divide-line/40 border-y border-line/40" data-testid="download-list">
+          {downloads.map((d) => (
+            <li key={d.token} className="group flex items-center justify-between gap-4 py-6 transition-colors hover:bg-glass">
+              <div>
+                <p className="font-display text-lg transition-colors group-hover:text-brass">{d.title}</p>
+                <p className="text-sm text-stone">{d.pages} pages &middot; PDF</p>
+              </div>
+              <a
+                href={`/api/download/${d.token}`}
+                data-testid="download-link"
+                className="btn-primary !py-2.5 !px-6"
+              >
+                Download
+              </a>
+            </li>
+          ))}
+        </ul>
 
-      <div className="mt-10 flex items-center justify-between text-sm">
-        <span className="text-stone">Order {order.id.slice(0, 8)} · {formatMoney(order.total)}</span>
-        <Link href="/collections" className="link-underline text-ink-soft">
-          Continue exploring →
-        </Link>
+        <div className="mt-10 flex items-center justify-between text-sm">
+          <span className="text-stone">Order {order.id.slice(0, 8)} &middot; {formatMoney(order.total)}</span>
+          <Link href="/collections" className="link-underline text-ink-soft transition-colors hover:text-brass">
+            Continue exploring &rarr;
+          </Link>
+        </div>
       </div>
     </section>
   );
