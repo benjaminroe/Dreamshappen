@@ -1,4 +1,4 @@
-import { prisma } from "./prisma";
+import { prisma, hasDatabaseUrl } from "./prisma";
 
 export type DashboardMetrics = {
   totalRevenue: number;
@@ -25,6 +25,13 @@ export type DashboardMetrics = {
 };
 
 export async function getDashboardMetrics(): Promise<DashboardMetrics> {
+  if (!hasDatabaseUrl) {
+    return {
+      totalRevenue: 0, orderCount: 0, paidOrders: 0, pendingOrders: 0,
+      totalDownloads: 0, subscriberCount: 0, productCount: 0, publishedCount: 0,
+      recentOrders: [], topProducts: [], ordersOverTime: [],
+    };
+  }
   const [
     orders,
     downloads,
@@ -94,6 +101,7 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
 }
 
 export async function listAllOrders() {
+  if (!hasDatabaseUrl) return [];
   const orders = await prisma.order.findMany({
     orderBy: { createdAt: "desc" },
     include: {
@@ -105,6 +113,7 @@ export async function listAllOrders() {
 }
 
 export async function getOrderDetail(id: string) {
+  if (!hasDatabaseUrl) return null;
   return prisma.order.findUnique({
     where: { id },
     include: {

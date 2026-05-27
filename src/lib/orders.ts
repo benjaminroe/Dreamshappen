@@ -1,4 +1,4 @@
-import { prisma } from "./prisma";
+import { prisma, hasDatabaseUrl } from "./prisma";
 import { getProductBySlug, getProductById } from "./products";
 import { lookupDiscount } from "./marketing";
 import type { Order, OrderItem, DownloadGrant, Product } from "./types";

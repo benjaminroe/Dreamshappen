@@ -1,7 +1,8 @@
-import { prisma } from "./prisma";
+import { prisma, hasDatabaseUrl } from "./prisma";
 
 // --- Marketing: newsletter / lead capture -------------------------------
 export async function addSubscriber(email: string, source = "footer"): Promise<boolean> {
+  if (!hasDatabaseUrl) return false;
   const normalized = email.trim().toLowerCase();
   const existing = await prisma.subscriber.findUnique({ where: { email: normalized } });
   if (existing) return false;
@@ -12,6 +13,7 @@ export async function addSubscriber(email: string, source = "footer"): Promise<b
 export async function listSubscribers(): Promise<
   { email: string; source: string; created_at: string }[]
 > {
+  if (!hasDatabaseUrl) return [];
   const rows = await prisma.subscriber.findMany({ orderBy: { createdAt: "desc" } });
   return rows.map((r) => ({ email: r.email, source: r.source, created_at: r.createdAt.toISOString() }));
 }
@@ -20,6 +22,7 @@ export async function listSubscribers(): Promise<
 export type Discount = { code: string; percent_off: number; active: number };
 
 export async function lookupDiscount(code: string): Promise<Discount | undefined> {
+  if (!hasDatabaseUrl) return undefined;
   const row = await prisma.discountCode.findFirst({
     where: { code: code.trim().toUpperCase(), active: true },
   });
@@ -36,6 +39,7 @@ export async function upsertDiscount(code: string, percentOff: number, active = 
 }
 
 export async function listDiscounts(): Promise<Discount[]> {
+  if (!hasDatabaseUrl) return [];
   const rows = await prisma.discountCode.findMany({ orderBy: { code: "asc" } });
   return rows.map((r) => ({ code: r.code, percent_off: r.percentOff, active: r.active ? 1 : 0 }));
 }

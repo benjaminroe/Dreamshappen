@@ -1,4 +1,4 @@
-import { prisma } from "./prisma";
+import { prisma, hasDatabaseUrl } from "./prisma";
 import type { Product } from "./types";
 import type { Prisma } from "@prisma/client";
 
@@ -48,6 +48,7 @@ function toProduct(row: Row): Product {
 export async function listProducts(
   opts: { includeUnpublished?: boolean } = {}
 ): Promise<Product[]> {
+  if (!hasDatabaseUrl) return [];
   const rows = await prisma.product.findMany({
     where: opts.includeUnpublished ? {} : { published: true },
     orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
@@ -57,11 +58,13 @@ export async function listProducts(
 }
 
 export async function getProductBySlug(slug: string): Promise<Product | undefined> {
+  if (!hasDatabaseUrl) return undefined;
   const row = await prisma.product.findUnique({ where: { slug }, select: productSelect });
   return row ? toProduct(row) : undefined;
 }
 
 export async function getProductById(id: string): Promise<Product | undefined> {
+  if (!hasDatabaseUrl) return undefined;
   const row = await prisma.product.findUnique({ where: { id }, select: productSelect });
   return row ? toProduct(row) : undefined;
 }
@@ -69,6 +72,7 @@ export async function getProductById(id: string): Promise<Product | undefined> {
 export async function getProductPdf(
   id: string
 ): Promise<{ data: Buffer; filename: string } | null> {
+  if (!hasDatabaseUrl) return null;
   const row = await prisma.product.findUnique({
     where: { id },
     select: { pdfData: true, pdfFilename: true, slug: true },

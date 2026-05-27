@@ -18,12 +18,17 @@ const directUrl =
   process.env.DATABASE_URL;
 if (!process.env.DIRECT_URL && directUrl) process.env.DIRECT_URL = directUrl;
 
+/** True when a DATABASE_URL is present (from env or mapped Vercel vars). */
+export const hasDatabaseUrl = Boolean(process.env.DATABASE_URL);
+
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 
 export const prisma =
   globalForPrisma.prisma ??
-  new PrismaClient({
-    log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
-  });
+  (hasDatabaseUrl
+    ? new PrismaClient({
+        log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
+      })
+    : (null as unknown as PrismaClient));
 
-if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+if (process.env.NODE_ENV !== "production" && hasDatabaseUrl) globalForPrisma.prisma = prisma;
